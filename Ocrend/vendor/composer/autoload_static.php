@@ -32,6 +32,10 @@ class ComposerStaticInit8717f8bd41e2851ee8528e88990f2038
         array (
             'Psr\\Log\\' => 8,
         ),
+        'D' => 
+        array (
+            'Devjuliocesar\\BashColor\\' => 24,
+        ),
     );
 
     public static $prefixDirsPsr4 = array (
@@ -78,6 +82,10 @@ class ComposerStaticInit8717f8bd41e2851ee8528e88990f2038
         'Psr\\Log\\' => 
         array (
             0 => __DIR__ . '/..' . '/psr/log/Psr/Log',
+        ),
+        'Devjuliocesar\\BashColor\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/devjuliocesar/bash-color/src',
         ),
     );
 

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "c671bb1474edf8a8d6411f99dc4766a8",
+    "content-hash": "1fad1b0ef7ff1e4f06a6bfc9a5bb73f8",
     "packages": [
         {
             "name": "phpmailer/phpmailer",
@@ -846,7 +846,50 @@
             "time": "2017-06-05T18:29:51+00:00"
         }
     ],
-    "packages-dev": [],
+    "packages-dev": [
+        {
+            "name": "devjuliocesar/bash-color",
+            "version": "1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/DevJuliocesar/bash-color.git",
+                "reference": "f05db2430a489aeb4c1e5a56345dfb2e5bacacdf"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/DevJuliocesar/bash-color/zipball/f05db2430a489aeb4c1e5a56345dfb2e5bacacdf",
+                "reference": "f05db2430a489aeb4c1e5a56345dfb2e5bacacdf",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Devjuliocesar\\BashColor\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Devjuliocesar",
+                    "email": "jcmaldonadom@ufpso.edu.co"
+                }
+            ],
+            "description": "A tool for output styled bash text.",
+            "keywords": [
+                "bash",
+                "colorized",
+                "console style",
+                "prompt"
+            ],
+            "time": "2018-01-17T15:24:40+00:00"
+        }
+    ],
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": [],

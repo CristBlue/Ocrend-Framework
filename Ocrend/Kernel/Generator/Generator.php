@@ -11,7 +11,9 @@
 
 namespace Ocrend\Kernel\Generator;
 
+use Ocrend\Kernel\Generator\Colors;
 use Ocrend\Kernel\Database\Database;
+use Devjuliocesar\BashColor\BashColor;
 
 /**
  * Generador de scripts en PHP
@@ -118,6 +120,280 @@ final class Generator {
       * @var array
     */
     private $tablesCollection = array();
+
+    /**
+     * Constructor, arranca el generador
+     *
+     * @throws \Exception si la cantida de argumentos es insuficiente
+     * @return void
+     */
+    public function __construct(array $args) {
+        try {
+            # Cantidad mínima de argumentos
+            if(sizeof($args) < 2) {
+//                throw new \Exception('El generador debe tener la forma php gen.php [comandos]');
+                $this->help();
+                return;
+            }
+            # Picar argumentos
+            $this->arguments = array_slice($args,1);
+            # Espacio en blanco
+            $this->writeLn();
+            # Empezar a leer los argumentos
+            $this->lexer();
+            # Comenzar a construir los archivos
+            $this->buildFiles();
+        } catch(\Exception $e) {
+            exit("\nEXCEPCION: " . $e->getMessage() . "\n");
+        }
+    }
+
+    /**
+     * Se encarga de analizar la sintaxis de los comandos y decidir qué hacer
+     *
+     * @throws \Exception cuando existe algún problema con la sintaxis
+     * @return void
+     */
+    private function lexer() {
+
+
+        # Saber si se pasaron opciones correctas
+        $lexer = false;
+
+        $action = explode(':',$this->arguments[0]);
+
+        switch ($action[0]){
+            case '-ayuda':
+            case '-help':
+            case '-h':
+                $this->help();
+                return;
+
+            case 'app':
+
+                if(in_array($this->arguments[1], ['-h', '-help', '-ayuda'])){
+                    $this->helpApp();
+
+                    if(!isset($action[1])){
+                        echo "\n";
+                        echo BashColor::render('<fg=white>      Ingrese un comando: </>');
+                        $handle = fopen ("php://stdin","r");
+                        $command = fgets($handle);
+                        $action[1] = trim($command);
+                    }
+
+                    if(!in_array($action[1], ['m', 'v', 'c', 'crud', 'mv', 'mc', 'vm', 'vc', 'cm', 'cv', 'mvc'])){
+                        throw new \Exception('La opción digitada no se encuentra');
+                    }
+
+                    echo "\n";
+                    echo BashColor::render('<fg=white>      Ingrese un nombre: </>');
+                    $handle = fopen ("php://stdin","r");
+                    $name = fgets($handle);
+                    $this->arguments[1] = trim($name);
+                }
+                # Examina si tiene la forma establecida
+                if(sizeof($action) != 2){
+                    throw new \Exception('El comando inicial debe tener la forma app:accion.');
+                }
+                # Verificar que exista un nombre
+                if(!array_key_exists(1,$this->arguments)) {
+                    throw new \Exception('Se debe asignar un nombre.');
+                }
+
+                # Formato del nombre
+                if(!preg_match('/^[a-zA-Z]*$/',$this->arguments[1])) {
+                    throw new \Exception('El nombre para el modulo solo puede contener letras.');
+                }
+
+                # Nombres para las partes del módulo
+                $this->name['controller'] = strtolower($this->arguments[1]) . 'Controller';
+                $this->name['model'] = ucfirst(strtolower($this->arguments[1]));
+                $this->name['view'] = strtolower($this->arguments[1]);
+
+                # Revisar lo que debe hacerse
+                if($action[1] == 'crud') {
+                    $lexer = true;
+                    $this->modules['crud'] = true;
+
+                    # Verificar que exista la opción de base de datos
+                    if(!array_key_exists(2,$this->arguments) || $this->arguments[2] != '-db') {
+                        throw new \Exception('El crud necesita el parametro -db.');
+                    }
+
+                } else {
+                    # Modelo
+                    if(strpos($action[1], 'm') !== false) {
+                        $lexer = true;
+                        $this->modules['model'] = true;
+                    }
+
+                    # Controlador
+                    if(strpos($action[1], 'c') !== false) {
+                        $lexer = true;
+                        $this->modules['controller'] = true;
+                    }
+
+                    # Vista
+                    if(strpos($action[1], 'v') !== false) {
+                        $lexer = true;
+                        $this->modules['view'] = true;
+                    }
+                }
+
+                break;
+
+            case 'ajax':
+            case 'api':
+            case 'db':
+                echo 'hola';
+                break;
+        }
+
+
+
+        # Error
+        if(!$lexer) {
+            throw new \Exception('Problema en la sintaxis, para informacion usar: php gen.php -ayuda');
+        }
+
+        # Existencia de opciones
+//        if(array_key_exists(2,$this->arguments)) {
+//            $size = sizeof($this->arguments);
+//            for($i = 2; $i < $size; $i++) {
+//
+//                # Base de datos
+//                if($this->arguments[$i] == '-db') {
+//                    # Revisar si existe un nombre
+//                    if(array_key_exists($i + 1, $this->arguments)) {
+//                        # Revisar la sintaxis del nombre
+//                        if(!preg_match('/^[a-zA-Z0-9_]*$/',$this->arguments[$i + 1])) {
+//                            throw new \Exception('El formato del nombre debe ser alfanumerico y el unico caracter extra permitido es el " _ "');
+//                        }
+//                        #  Establecer el nombre
+//                        $this->table_name = strtolower($this->arguments[$i + 1]);
+//
+//                        # Revisar que existe al menos un campo
+//                        if(!array_key_exists($i + 2, $this->arguments)) {
+//                            throw new \Exception('Se necesita al menos un campo para la tabla.');
+//                        }
+//
+//                        # Recorrer los campos y revisar la sintaxis uno a uno
+//                        for($x = $i + 2; $x < $size; $x++) {
+//                            $campo = explode(':',$this->arguments[$x]);
+//                            # Requisito mínimo, nombre y tipo
+//                            if(sizeof($campo) >= 2) {
+//                                # Formato del nombre
+//                                if(!preg_match('/^[a-zA-Z0-9_]*$/',$campo[0])) {
+//                                    throw new \Exception('El formato del nombre del campo '. $campo[0] .' debe ser alfanumerico y el unico caracter extra permitido es el " _ "');
+//                                }
+//                                # Tipo de dato
+//                                if(!in_array(strtolower($campo[1]),['tinyint','bit','bool','smallint','mediumint','int','bigint','integer','float','xreal','double','decimal','date','datetime','timestamp','char','varchar','tinytext','text','mediumtext','longtext','enum'])) {
+//                                    throw new \Exception('El tipo de dato ' . $campo[1] . ' no existe.');
+//                                }
+//                                # Almacenar en la colección
+//                                $this->tablesCollection[$campo[0]] = array(
+//                                    'tipo' => strtoupper($campo[1]),
+//                                    'longitud' => null
+//                                );
+//                            } else {
+//                                throw new \Exception('El formato del campo ' . $this->arguments[$x] . ' debe ser nombre:tipo.');
+//                            }
+//
+//                            # Existe longitud
+//                            if(sizeof($campo) == 3) {
+//                                # Revisar valor de longitud
+//                                if($campo[2] < 0) {
+//                                    throw new \Exception('La longitud del campo ' . $campo[0] . ' debe ser positiva.');
+//                                }
+//                                # Poner longitud
+//                                $this->tablesCollection[$campo[0]]['longitud'] = $campo[2];
+//                            }
+//                        }
+//                    }
+//
+//                    $this->modules['database'] = true;
+//                    break;
+//                }
+//
+//                # Javascript ajax valores por defecto, también los mismos si existe un crud
+//                if($this->arguments[$i] == '-ajax' || $this->modules['crud']) {
+//                    $this->modules['ajax'] = true;
+//                    $this->modules['api'] = 'post';
+//                }
+//
+//                # Api rest
+//                if(strpos($this->arguments[$i], '-api:') !== false) {
+//                    if(in_array(strtolower($this->arguments[$i]),['-api:get','-api:post','-api:put','-api:delete'])) {
+//                        $this->modules['api'] = strtolower(explode(':',$this->arguments[$i])[1]);
+//                    } else {
+//                        throw new \Exception('El verbo HTTP de la api rest no existe.');
+//                    }
+//                }
+//
+//            }
+//        }
+    }
+
+    /**
+     * Escribe un mensaje en consola y salta de línea
+     *
+     * @param null|string $msg: Mensaje
+     *
+     * @return void
+     */
+    private function writeLn($msg = null) {
+
+        if(null != $msg) {
+            echo $msg;
+        }
+        echo "\n";
+    }
+
+    /**
+     * Devuelve un string con el contenido de un archivo
+     *
+     * @param string $dir: Directorio del archivo a leer
+     *
+     * @return string : con contenido del archivo
+     */
+    private function readFile(string $dir) : string {
+        $lines = '';
+        $f = new \SplFileObject($dir);
+        while (!$f->eof()) {
+            $lines .= $f->fgets();
+        }
+        return (string) $lines;
+    }
+    /**
+     * Escribe un string completo en un archivo, si este no existe lo crea
+     *
+     * @param string $dir: Directorio del archivo escribir/crear
+     * @param string $content: Contenido a escribir
+     *
+     * @throws \Exception si el fichero ya existe
+     * @return int :catidad de bytes escritos en el archivo
+     */
+    private function writeFile(string $dir, string $content) : int {
+        if(file_exists($dir)) {
+            throw new \Exception('El fichero ' . $dir . ' ya existe.');
+        }
+
+        $f = new \SplFileObject($dir,'w');
+        return (int) $f->fwrite($content);
+    }
+    /**
+     * Escribe un string al final, en un archivo existente
+     *
+     * @param string $dir: Directorio del archivo sobre el cual se va a escribir
+     * @param string $content: Contenido a escribir
+     *
+     * @return int : catidad de bytes escritos en el archivo
+     */
+    private function writeInFile(string $dir, string $content) : int {
+        $f = new \SplFileObject($dir,'a+');
+        return (int) $f->fwrite("\n\n" . $content);
+    }
 
     /**
       * Crea el contenido de una tabla.
@@ -269,10 +545,10 @@ final class Generator {
     }
 
     /**
-      * Crea las vistas solicitadas por comando
-      *
-      * @return void
-    */
+     * Crea las vistas solicitadas por comando
+     * @return void
+     * @throws \Exception
+     */
     private function createViews() {
       # Ruta para las vistas
       $ruta = self::R_TEMPLATES . $this->name['view'] . '/';
@@ -321,66 +597,6 @@ final class Generator {
         $this->writeFile($ruta . $this->name['view'] . '.twig',$blank);
         $this->writeLn('Se ha creado el fichero ' . $ruta . $this->name['view'] . '.twig');
       }
-    }
-
-    /**
-      * Escribe un mensaje en consola y salta de línea 
-      *
-      * @param null|string $msg: Mensaje 
-      *
-      * @return void
-    */
-    private function writeLn($msg = null) {
-        if(null != $msg) {
-            echo "$msg";
-        } 
-        
-        echo "\n";
-    }
-
-    /**
-      * Devuelve un string con el contenido de un archivo
-      *
-      * @param string $dir: Directorio del archivo a leer
-      *
-      * @return string : con contenido del archivo
-    */
-    private function readFile(string $dir) : string {
-      $lines = '';
-      $f = new \SplFileObject($dir);
-      while (!$f->eof()) {
-          $lines .= $f->fgets();
-      }
-      return (string) $lines;
-    }
-    /**
-      * Escribe un string completo en un archivo, si este no existe lo crea
-      *
-      * @param string $dir: Directorio del archivo escribir/crear
-      * @param string $content: Contenido a escribir
-      *
-      * @throws \Exception si el fichero ya existe
-      * @return int :catidad de bytes escritos en el archivo
-    */
-    private function writeFile(string $dir, string $content) : int {
-      if(file_exists($dir)) {
-        throw new \Exception('El fichero ' . $dir . ' ya existe.');
-      }
-      
-      $f = new \SplFileObject($dir,'w');
-      return (int) $f->fwrite($content);
-    }
-    /**
-      * Escribe un string al final, en un archivo existente
-      *
-      * @param string $dir: Directorio del archivo sobre el cual se va a escribir
-      * @param string $content: Contenido a escribir
-      *
-      * @return int : catidad de bytes escritos en el archivo
-    */
-    private function writeInFile(string $dir, string $content) : int {
-      $f = new \SplFileObject($dir,'a+');
-      return (int) $f->fwrite("\n\n" . $content);
     }
 
     /**
@@ -896,230 +1112,61 @@ $database_fields
       *
       * @return void
     */
+
+    private function header(){
+        echo BashColor::render('<fg=red>  _____  _       _     _     </>'), "\n";
+        echo BashColor::render('<fg=red> |  __ \(_)     (_)   (_)    </>'), "\n";
+        echo BashColor::render('<fg=red> | |  | |___   ___ ___ _ ___  </>'), "\n";
+        echo BashColor::render('<fg=red> | |  | | \ \ / / / __| / __| </>'), "\n";
+        echo BashColor::render('<fg=red> | |__| | |\ V /| \__ \ \__ \ </>'), "\n";
+        echo BashColor::render('<fg=red> |_____/|_| \_/ |_|___/_|___/ </>');
+        echo BashColor::render('<fg=default>  CLI</><fg=blue>  1.0</>'), "\n";
+        echo "\n";
+
+    }
+
     private function help() {
-        $this->writeLn();
-        $this->writeLn('Comandos disponibles ');
-        $this->writeLn('-------------------------------------');
-        $this->writeLn();
-        $this->writeLn('Crear un crud conectado a la base de datos:');
-        $this->writeLn('app:crud [Nombre] [Nombre de la tabla en la DB] campo1:tipo:longitud(opcional) campo2:tipo ...');
-        $this->writeLn();
-        $this->writeLn('Crear un modelo, una vista y un controlador:');
-        $this->writeLn('app:mvc [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear una vista y un controlador:');
-        $this->writeLn('app:vc [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear un modelo y un controlador:');
-        $this->writeLn('app:mc [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear un modelo y una vista:');
-        $this->writeLn('app:mv [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear un modelo vacio:');
-        $this->writeLn('app:m [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear un controlador vacio:');
-        $this->writeLn('app:c [Nombre]');
-        $this->writeLn();
-        $this->writeLn('Crear una vista vacia:');
-        $this->writeLn('app:v [Nombre]');
-        $this->writeLn();
-        $this->writeLn();
-        $this->writeLn('Opciones extras, se aniaden al final de una instruccion.');
-        $this->writeLn('-------------------------------------');
-        $this->writeLn();
-        $this->writeLn('Generar un fichero javascript de ajax que apunta a la api rest via POST.');
-        $this->writeLn('-ajax');
-        $this->writeLn();
-        $this->writeLn('Escribe en el fichero del verbo http correspondiente en la api rest.');
-        $this->writeLn('-api:[verbo]');
-        $this->writeLn();
-        $this->writeLn('Agregar caracteristica DBModel a un modelo creado, (No puede haber ninguna otra opcion despues de esta)');
-        $this->writeLn('-db');
-        $this->writeLn();
-        $this->writeLn('Crear una tabla en la base de datos, (No puede haber ninguna otra opcion despues de esta).');
-        $this->writeLn('-db [Nombre de la tabla en la DB] campo1:tipo:longitud(opcional) campo2:tipo');
+        $this->header();
+        echo "\n";
+        echo BashColor::render('<fg=white;opt=bold>  Modo de Uso: </>'), "\n";
+        echo "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>php gen.php <comando> <nombre> </>'), "\n";
+        echo "\n\n";
+        echo BashColor::render('<fg=white;opt=bold>  Comandos del Proyecto:</>'), "\n";
+        echo "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>app:<sub_comando> </><opt=dim>....... </><fg=white>Generar un modulo </><opt=dim>(subcomandos: </><fg=green>mvc</><opt=dim>, </><fg=green>crud</><opt=dim>)</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>-ajax </><opt=dim>................... </><fg=white>Generar un fichero javascript de ajax que</>'), "\n";
+        echo BashColor::render('<opt=white>                                apunte a la api rest via POST.</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>-api:<verbo> </><opt=dim>............ </><fg=white>Escribe en el fichero del verbo http</>'), "\n";
+        echo BashColor::render('<opt=white>                                correspondiente en la API REST.</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>-db <opciones></><opt=dim>........... </><fg=white>Agregar tabla en la base de datos y/o </>'), "\n";
+        echo BashColor::render('<opt=white>                                caracteristicas</>'), "\n";
+
+//        $this->writeLn('Crear una tabla en la base de datos, (No puede haber ninguna otra opcion despues de esta).');
+//        $this->writeLn('-db [Nombre de la tabla en la DB] campo1:tipo:longitud(opcional) campo2:tipo');
     }
 
-    /**
-      * Se encarga de analizar la sintaxis de los comandos y decidir qué hacer
-      *
-      * @throws \Exception cuando existe algún problema con la sintaxis
-      * @return void
-    */
-    private function lexer() {
-      # Cargar la ayuda
-      if($this->arguments[0] == '-ayuda' || 
-         $this->arguments[0] == '-ashuda' || 
-         $this->arguments[0] == '-help') {
-        
-        $this->help();
-
-        return;
-      }
-
-      # Verificar comando
-      $action = explode(':',$this->arguments[0]);
-      if(sizeof($action) != 2 || $action[0] != 'app') {
-        throw new \Exception('El comando inicial debe tener la forma app:accion.');
-      }
-  
-      # Verificar que exista un nombre 
-      if(!array_key_exists(1,$this->arguments)) {
-        throw new \Exception('Se debe asignar un nombre.');
-      } else {
-
-        # Formato del nombre
-        if(!preg_match('/^[a-zA-Z]*$/',$this->arguments[1])) {
-          throw new \Exception('El nombre para el modulo solo puede contener letras.');
-        }
-
-        # Nombres para las partes del módulo
-        $this->name['controller'] = strtolower($this->arguments[1]) . 'Controller';
-        $this->name['model'] = ucfirst(strtolower($this->arguments[1]));
-        $this->name['view'] = strtolower($this->arguments[1]);
-      }
-
-      # Saber si se pasaron opciones correctas
-      $lexer = false;
-
-      # Revisar lo que debe hacerse 
-      if($action[1] == 'crud') {
-        $lexer = true;
-        $this->modules['crud'] = true;
-
-        # Verificar que exista la opción de base de datos
-        if(!array_key_exists(2,$this->arguments) || $this->arguments[2] != '-db') {
-          throw new \Exception('El crud necesita el parametro -db.');
-        }
-
-      } else {
-        # Modelo
-        if(strpos($action[1], 'm') !== false) {
-          $lexer = true;
-          $this->modules['model'] = true;
-        }
-
-        # Controlador
-        if(strpos($action[1], 'c') !== false) {
-          $lexer = true;
-          $this->modules['controller'] = true;
-        }
-
-        # Vista
-        if(strpos($action[1], 'v') !== false) {
-          $lexer = true;
-          $this->modules['view'] = true;
-        }
-      }
-
-      # Error
-      if(!$lexer) {
-        throw new \Exception('Problema en la sintaxis, para informacion usar: php gen.php -ayuda');
-      }
-
-      # Existencia de opciones
-      if(array_key_exists(2,$this->arguments)) {
-        $size = sizeof($this->arguments);
-        for($i = 2; $i < $size; $i++) {
-
-          # Base de datos
-          if($this->arguments[$i] == '-db') {  
-            # Revisar si existe un nombre
-            if(array_key_exists($i + 1, $this->arguments)) {
-              # Revisar la sintaxis del nombre 
-              if(!preg_match('/^[a-zA-Z0-9_]*$/',$this->arguments[$i + 1])) {
-                throw new \Exception('El formato del nombre debe ser alfanumerico y el unico caracter extra permitido es el " _ "');
-              }
-              #  Establecer el nombre
-              $this->table_name = strtolower($this->arguments[$i + 1]);
-
-               # Revisar que existe al menos un campo
-              if(!array_key_exists($i + 2, $this->arguments)) {
-                throw new \Exception('Se necesita al menos un campo para la tabla.');
-              }
-
-              # Recorrer los campos y revisar la sintaxis uno a uno
-              for($x = $i + 2; $x < $size; $x++) {
-                $campo = explode(':',$this->arguments[$x]);
-                # Requisito mínimo, nombre y tipo
-                if(sizeof($campo) >= 2) {
-                  # Formato del nombre
-                  if(!preg_match('/^[a-zA-Z0-9_]*$/',$campo[0])) {
-                    throw new \Exception('El formato del nombre del campo '. $campo[0] .' debe ser alfanumerico y el unico caracter extra permitido es el " _ "');
-                  }
-                  # Tipo de dato
-                  if(!in_array(strtolower($campo[1]),['tinyint','bit','bool','smallint','mediumint','int','bigint','integer','float','xreal','double','decimal','date','datetime','timestamp','char','varchar','tinytext','text','mediumtext','longtext','enum'])) {
-                    throw new \Exception('El tipo de dato ' . $campo[1] . ' no existe.');
-                  }
-                  # Almacenar en la colección
-                  $this->tablesCollection[$campo[0]] = array(
-                    'tipo' => strtoupper($campo[1]), 
-                    'longitud' => null
-                  );
-                } else {
-                  throw new \Exception('El formato del campo ' . $this->arguments[$x] . ' debe ser nombre:tipo.');
-                }
-
-                # Existe longitud
-                if(sizeof($campo) == 3) {
-                  # Revisar valor de longitud
-                  if($campo[2] < 0) {
-                    throw new \Exception('La longitud del campo ' . $campo[0] . ' debe ser positiva.');
-                  }
-                  # Poner longitud
-                  $this->tablesCollection[$campo[0]]['longitud'] = $campo[2];
-                }
-              }
-            }
-
-            $this->modules['database'] = true;
-            break;
-          }
-
-          # Javascript ajax valores por defecto, también los mismos si existe un crud
-          if($this->arguments[$i] == '-ajax' || $this->modules['crud']) {
-            $this->modules['ajax'] = true;
-            $this->modules['api'] = 'post';
-          }
-
-          # Api rest 
-          if(strpos($this->arguments[$i], '-api:') !== false) {
-            if(in_array(strtolower($this->arguments[$i]),['-api:get','-api:post','-api:put','-api:delete'])) {
-              $this->modules['api'] = strtolower(explode(':',$this->arguments[$i])[1]);
-            } else {
-              throw new \Exception('El verbo HTTP de la api rest no existe.');
-            }
-          }
-          
-        }
-      }
+    private function helpApp(){
+        $this->header();
+        echo "\n";
+        echo BashColor::render('<fg=light_green;opt=bold>  php gen.php app </><fg=white;opt=bold>  - Genera un modulo en la carpeta app</>'), "\n";
+        echo "\n";
+        echo BashColor::render('<fg=white;opt=bold>  Modo de Uso: </>'), "\n";
+        echo "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>php gen.php app:<comando> <nombre></>'), "\n";
+        echo "\n";
+        echo "\n";
+        echo BashColor::render('<fg=white;opt=bold>   Opciones: </>'), "\n";
+        echo "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>m <nombre> </><opt=dim>.......... </><fg=white>Crear un modelo</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>v <nombre> </><opt=dim>.......... </><fg=white>Crear una vista</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>c <nombre> </><opt=dim>.......... </><fg=white>Crear un controlador</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>mvc <nombre> </><opt=dim>........ </><fg=white>Crear modelo, vista y controlador</>'), "\n";
+        echo "\n";
+        echo "\n";
+        echo BashColor::render('<fg=white;opt=bold>   Opciones Avanzadas: </>'), "\n";
+        echo "\n";
+        echo BashColor::render('<fg=white>      Crear un crud conectado a la base de datos</>'), "\n";
+        echo BashColor::render('<opt=dim>    $ </><fg=green>crud <nombre> <nombre_tabla> campo1:tipo:length(opc) campo2:tipo</>'), "\n";
     }
-
-    /**
-      * Constructor, arranca el generador
-      *
-      * @throws \Exception si la cantida de argumentos es insuficiente
-      * @return void
-    */
-    public function __construct(array $args) {
-      try {
-        # Cantidad mínima de argumentos 
-        if(sizeof($args) < 2) {
-          throw new \Exception('El generador debe tener la forma php gen.php [comandos]');
-        }
-        # Picar argumentos
-        $this->arguments = array_slice($args,1);
-        # Espacio en blanco
-        $this->writeLn();
-        # Empezar a leer los argumentos
-        $this->lexer();
-        # Comenzar a construir los archivos
-        $this->buildFiles();
-      } catch(\Exception $e) {
-        exit("\nEXCEPCION: " . $e->getMessage() . "\n");
-      }
-    }
-
 }
